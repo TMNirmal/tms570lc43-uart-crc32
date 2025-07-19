@@ -1,0 +1,21 @@
+# CCS build folders
+Debug/
+Release/
+
+# Object and binary files
+*.obj
+*.out
+*.map
+*.bin
+*.elf
+*.d
+*.lst
+*.log
+
+# Project settings (optional)
+.settings/
+*.launch
+
+# OS junk
+.DS_Store
+Thumbs.db
