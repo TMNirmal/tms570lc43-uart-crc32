@@ -10,7 +10,7 @@ This repository contains a series of UART-based CRC32 applications developed for
 - **UART Port**: SCI1 (USB-to-PC), SCI3 (external USB-TTL via CH340E)
 - **Baud Rate**: 937500
 - **UART Config**: 2 Stop Bits, No Parity
-- **Max Data Size**: 4096 bytes
+- **Max Data Size**: 4096 bytes (except large file variant)
 - **Idle Timeout**: 5000 ms
 - **CRC Algorithm**: Ethernet CRC32 (IEEE 802.3 Polynomial)
 
@@ -58,6 +58,24 @@ This repository contains a series of UART-based CRC32 applications developed for
 
 ---
 
+### 📁 uart-crc32-interrupt-largefiles
+
+**Objective**: Enhance interrupt-based implementation to support **incremental CRC32 calculation** for large files.
+
+**Features**:
+
+- Based on `uart-crc32-interrupt`.
+- Supports CRC32 computation over continuous large data streams using an **incremental algorithm**.
+- Resets and finalizes CRC after **5 seconds of idle timeout**.
+- Ideal for real-world scenarios where data exceeds buffer limits.
+
+**Advantages**:
+
+- Enables full-file CRC calculation over UART without needing to buffer all data.
+- Maintains high baud rate support without character loss.
+
+---
+
 ### 📁 uart-crc32-dma (WIP)
 
 **Objective**: Implement UART reception using DMA for robust, non-blocking, high-speed transfer.
@@ -81,11 +99,12 @@ This repository contains a series of UART-based CRC32 applications developed for
 
 ## 📌 Summary
 
-| Project              | Method          | Reliable @ 937500 baud  | Notes                                                 |
-| -------------------- | --------------- | ----------------------- | ----------------------------------------------------- |
-| uart-crc32           | Blocking        | ❌ (char loss)          | Needs 1ms char delay in Tera Term                     |
-| uart-crc32-interrupt | Interrupt + RTI | ✅                      | Works without delay; best for low-moderate throughput |
-| uart-crc32-dma       | DMA (WIP)       | ⚠️ (Not yet functional) | Pending TI response, hardware issue suspected         |
+| Project                         | Method                            | Reliable @ 937500 baud  | Notes                                                     |
+| ------------------------------- | --------------------------------- | ----------------------- | --------------------------------------------------------- |
+| uart-crc32                      | Blocking                          | ❌ (char loss)          | Needs 1ms char delay in Tera Term                         |
+| uart-crc32-interrupt            | Interrupt + RTI                   | ✅                      | Reliable; idle-based framing                              |
+| uart-crc32-interrupt-largefiles | Interrupt + RTI + Incremental CRC | ✅                      | Supports large files with incremental CRC over 5s timeout |
+| uart-crc32-dma                  | DMA (WIP)                         | ⚠️ (Not yet functional) | Pending TI response; hardware/DMA limitations suspected   |
 
 ---
 
@@ -95,6 +114,7 @@ This repository contains a series of UART-based CRC32 applications developed for
 - Benchmark CPU load: interrupt vs. DMA.
 - Add CRC32 verification for received binary files.
 - Optionally extend support for ASCII/binary data mode.
+- Add UART transmit path for CRC acknowledgment.
 
 ---
 
