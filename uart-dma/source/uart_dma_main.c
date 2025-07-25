@@ -1,62 +1,57 @@
 #include "HL_sys_common.h"
-#include "HL_sci.h"
 #include "HL_sys_dma.h"
 #include "HL_system.h"
 
-#define RX_BUFFER_SIZE 8
-#define DMA_SCI3_RX    DMA_REQ30
+#define D_SIZE 500
 
-uint8_t rx_buffer[RX_BUFFER_SIZE];
-g_dmaCTRL g_dmaCTRLPKT_RX;
+uint16 TX_DATA[D_SIZE];         // Transmit buffer in RAM
+uint16 RX_DATA[D_SIZE] = {0};   // Receive buffer in RAM
 
-void setup_dma_rx(void);
+g_dmaCTRL g_dmaCTRLPKT;         // DMA control packet
+
+void loadDataPattern(uint32 psize, uint16* pptr);
 
 int main(void)
 {
-    systemInit();      // Ensure all peripherals are powered up!
-    sciInit();         // Initialize SCI3
-    dmaEnable();       // Enable DMA module
+    systemInit();    // Power up all peripherals
+    dmaEnable();     // Enable DMA module
 
-    // DMA RX setup
-    dmaReqAssign(DMA_CH0, DMA_SCI3_RX);
-    setup_dma_rx();
+    loadDataPattern(D_SIZE, TX_DATA);
 
-    while (1)
-    {
-        // Wait for DMA RX block complete
-        if (dmaGetInterruptStatus(DMA_CH0, BTC) == TRUE)
-        {
-            // Echo received data back (polling TX)
-            for (int i = 0; i < RX_BUFFER_SIZE; i++)
-                sciSendByte(sciREG3, rx_buffer[i]);
+    // Configure DMA control packet for memory-to-memory transfer
+    g_dmaCTRLPKT.SADD      = (uint32)TX_DATA;
+    g_dmaCTRLPKT.DADD      = (uint32)RX_DATA;
+    g_dmaCTRLPKT.CHCTRL    = 0;
+    g_dmaCTRLPKT.FRCNT     = 1;             // 1 frame
+    g_dmaCTRLPKT.ELCNT     = D_SIZE;        // D_SIZE elements
+    g_dmaCTRLPKT.ELDOFFSET = 0;
+    g_dmaCTRLPKT.ELSOFFSET = 0;
+    g_dmaCTRLPKT.FRDOFFSET = 0;
+    g_dmaCTRLPKT.FRSOFFSET = 0;
+    g_dmaCTRLPKT.PORTASGN  = PORTA_READ_PORTA_WRITE;
+    g_dmaCTRLPKT.RDSIZE    = ACCESS_16_BIT;
+    g_dmaCTRLPKT.WRSIZE    = ACCESS_16_BIT;
+    g_dmaCTRLPKT.TTYPE     = FRAME_TRANSFER;
+    g_dmaCTRLPKT.ADDMODERD = ADDR_INC1;
+    g_dmaCTRLPKT.ADDMODEWR = ADDR_INC1;
+    g_dmaCTRLPKT.AUTOINIT  = AUTOINIT_OFF;
 
-            // Clear BTC flag and re-arm DMA for next block
-            dmaREG->BTCFLAG = (1U << DMA_CH0);
-            setup_dma_rx();
-        }
-    }
+    dmaSetCtrlPacket(DMA_CH0, g_dmaCTRLPKT);
+
+    // Software trigger for memory-to-memory transfer
+    dmaSetChEnable(DMA_CH0, DMA_SW);
+
+    // Wait for DMA transfer to complete
+    while (dmaGetInterruptStatus(DMA_CH0, BTC) != TRUE);
+
+    // At this point, RX_DATA should be a copy of TX_DATA
+    while (1);
 }
 
-void setup_dma_rx(void)
+void loadDataPattern(uint32 psize, uint16* pptr)
 {
-    g_dmaCTRLPKT_RX.SADD      = (uint32)&(sciREG3->RD);   // Source: SCI3 RX register
-    g_dmaCTRLPKT_RX.DADD      = (uint32)rx_buffer;        // Destination: rx_buffer in RAM
-    g_dmaCTRLPKT_RX.CHCTRL    = 0;
-    g_dmaCTRLPKT_RX.FRCNT     = RX_BUFFER_SIZE;           // Number of bytes to receive
-    g_dmaCTRLPKT_RX.ELCNT     = 1;
-    g_dmaCTRLPKT_RX.ELDOFFSET = 0;
-    g_dmaCTRLPKT_RX.ELSOFFSET = 0;
-    g_dmaCTRLPKT_RX.FRDOFFSET = 0;
-    g_dmaCTRLPKT_RX.FRSOFFSET = 0;
-    g_dmaCTRLPKT_RX.PORTASGN  = PORTB_READ_PORTA_WRITE;
-    g_dmaCTRLPKT_RX.RDSIZE    = ACCESS_8_BIT;
-    g_dmaCTRLPKT_RX.WRSIZE    = ACCESS_8_BIT;
-    g_dmaCTRLPKT_RX.TTYPE     = FRAME_TRANSFER;
-    g_dmaCTRLPKT_RX.ADDMODERD = ADDR_FIXED;               // Source fixed (SCI3->RD)
-    g_dmaCTRLPKT_RX.ADDMODEWR = ADDR_INC1;                // Dest increment (buffer)
-    g_dmaCTRLPKT_RX.AUTOINIT  = AUTOINIT_OFF;
-
-    dmaSetCtrlPacket(DMA_CH0, g_dmaCTRLPKT_RX);
-    dmaSetChEnable(DMA_CH0, DMA_HW);                      // Hardware trigger
-    sciREG3->SETINT |= (1 << 17);                         // Enable RX DMA request
+    for (uint32 count = 0; count < psize; count++)
+    {
+        pptr[count] = count;
+    }
 }

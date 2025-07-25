@@ -604,32 +604,3 @@ boolean dmaGetInterruptStatus(dmaChannel_t channel, dmaInterrupt_t inttype)
 
 
 
-
-/** @fn void dmaBTCAInterrupt(void)
-*   @brief DMA Interrupt Handler
-*
-*   Block transfer complete Interrupt handler for DMA channel routed to Group A
-*
-*/
-#pragma CODE_STATE(dmaBTCAInterrupt, 32)
-#pragma INTERRUPT(dmaBTCAInterrupt, IRQ)
-
-/* SourceId : DMA_SourceId_021 */
-/* DesignId : DMA_DesignId_016 */
-/* Requirements : HL_CONQ_DMA_SR19 */
-void dmaBTCAInterrupt(void)
-{
-    uint32 offset = dmaREG->BTCAOFFSET;
-
-/* USER CODE BEGIN (40) */
-/* USER CODE END */
-
-    if (offset != 0U)
-    {
-        dmaGroupANotification(BTC, offset - 1U);
-    }
-
-/* USER CODE BEGIN (41) */
-/* USER CODE END */
-
-}

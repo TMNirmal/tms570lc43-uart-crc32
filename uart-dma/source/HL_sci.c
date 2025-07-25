@@ -140,7 +140,7 @@ void sciInit(void)
     sciREG3->SETINT = (uint32)((uint32)0U << 26U)  /* Framing error */
                    | (uint32)((uint32)0U << 25U)  /* Overrun error */
                    | (uint32)((uint32)0U << 24U)  /* Parity error */
-                   | (uint32)((uint32)1U << 9U)  /* Receive */
+                   | (uint32)((uint32)0U << 9U)  /* Receive */
                    | (uint32)((uint32)0U << 1U)  /* Wakeup */
                    | (uint32)((uint32)0U << 0U);  /* Break detect */
 
