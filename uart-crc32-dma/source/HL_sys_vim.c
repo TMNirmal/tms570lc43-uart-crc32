@@ -1,12 +1,12 @@
 /** @file HL_sys_vim.c
 *   @brief VIM Driver Implementation File
-*   @date 07-July-2017
-*   @version 04.07.00
+*   @date 11-Dec-2018
+*   @version 04.07.01
 *
 */
 
 /* 
-* Copyright (C) 2009-2016 Texas Instruments Incorporated - www.ti.com  
+* Copyright (C) 2009-2018 Texas Instruments Incorporated - www.ti.com  
 * 
 * 
 *  Redistribution and use in source and binary forms, with or without 
@@ -71,7 +71,7 @@ static const t_isrFuncPTR s_vim_init[128U] =
     &phantomInterrupt,
     &esmHighInterrupt,        /* Channel 0   */
     &phantomInterrupt,        /* Channel 1   */
-    &phantomInterrupt,          /* Channel 2   */
+    &rtiCompare0Interrupt,        /* Channel 2   */
     &phantomInterrupt,          /* Channel 3   */
     &phantomInterrupt,          /* Channel 4   */
     &phantomInterrupt,          /* Channel 5   */
@@ -366,7 +366,7 @@ void vimInit(void)
     /* enable interrupts */
     vimREG->REQMASKSET0 = (uint32)((uint32)1U << 0U)
                         | (uint32)((uint32)1U << 1U)
-                        | (uint32)((uint32)0U << 2U)
+                        | (uint32)((uint32)1U << 2U)
                         | (uint32)((uint32)0U << 3U)
                         | (uint32)((uint32)0U << 4U)
                         | (uint32)((uint32)0U << 5U)

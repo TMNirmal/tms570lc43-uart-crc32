@@ -1,25 +1,7 @@
 # UART CRC32 Applications for TMS570LC4357
 
-This repository contains a series of UART-based CRC32 applications developed for the **TI LAUNCHXL2-570LC43** development board featuring the **TMS570LC4357BZWT** microcontroller.  
+This repository contains a series of UART-based CRC32 applications for the **TI LAUNCHXL2-570LC43** development board (TMS570LC4357BZWT).  
 The goal is to reliably receive high-speed UART data, detect idle timeouts, and compute a **CRC32 checksum using the Ethernet (IEEE 802.3) polynomial**.
-
----
-
-## ⚠️ Critical Notes for DMA Operation
-
-- **Cache must be disabled for DMA to work reliably.**
-
-  - In HALCoGen, go to the R5-MPU-PMU tab and **uncheck "Enable Cache"**.
-  - If cache is enabled, DMA transfers may silently fail or not update RAM as expected.
-  - This applies to both new and old boards.
-
-- **DMA UART RX echo is only reliable at lower baud rates (e.g., 26042).**
-
-  - At higher baud rates, character loss or data corruption may occur due to CPU/DMA limitations and cache effects.
-  - For high-speed UART (e.g., 937500 baud), use interrupt-based or polling-based UART reception.
-
-- **Interrupt and polling-based UART reception are reliable at high baud rates.**
-  - Use these methods for applications requiring maximum UART throughput.
 
 ---
 
@@ -28,8 +10,8 @@ The goal is to reliably receive high-speed UART data, detect idle timeouts, and 
 - **Board:** TI LAUNCHXL2-570LC43
 - **MCU:** TMS570LC4357BZWT
 - **Compiler:** TI ARM Compiler v20.2.7.LTS
-- **UART Ports:** SCI1 (USB-to-PC), SCI3 (external USB-TTL via CH340E)
-- **Baud Rate:** 937500 (for interrupt/polling), 26042 (for DMA)
+- **UART Ports:** SCI1 (USB UART), SCI3 (external USB-TTL via CH340E)
+- **Baud Rate:** 937500 (SCI1, interrupt/polling), 26042 (DMA, SCI3)
 - **UART Config:** 2 Stop Bits, No Parity
 - **Max Data Size:** 4096 bytes (except large file variant)
 - **Idle Timeout:** 5000 ms
@@ -37,111 +19,97 @@ The goal is to reliably receive high-speed UART data, detect idle timeouts, and 
 
 ---
 
-## 🗂 Project Structure
+## Project Evolution & Key Learnings
 
 ### 📁 uart-crc32
 
-**Objective:** Basic implementation using UART SCI1 (USB) with CRC32 calculation after idle timeout.
-
-- Blocking UART reception.
-- Uses HALCoGen configuration.
-- CRC calculated after 5000ms idle time.
-- Simple implementation, but has **character loss at high baud rates**.
-
-**Limitations:**  
-At 937500 baud, Tera Term must be set to **1ms character delay** to avoid data loss.
+- **Blocking UART reception** on SCI1 (USB UART).
+- CRC calculated after 5000ms idle.
+- **Limitation:** At 937500 baud, Tera Term must be set to **1ms character delay** to avoid data loss.
+- **Lesson:** High baud rates cause character loss in blocking mode.
 
 ---
 
 ### 📁 uart-crc32-interrupt
 
-**Objective:** Improve reliability with interrupt-based UART reception and RTI-based idle timeout detection.
-
-- **SCI1:** Enabled RX interrupt (VIM Channel 13).
-- **RTI:** Enabled with default config for 1ms tick using Compare 0 (VIM Channel 2).
-- **Receive Buffer Size:** 6144 bytes.
-- `sciReceive()` used to initiate buffered interrupt-driven reception.
-
-**Advantages:**  
-No data loss at 937500 baud, even without Tera Term character delay.
-
-**Notes:**
-
-- `HL_notification.c` default handlers removed or redirected to user `main.c`.
-- RTI compare period tuned to detect 5000ms idle.
+- **Interrupt-based UART reception** with RTI-based idle timeout.
+- **HALCoGen config:**
+  - Enable SCI1, set baudrate 937500, 2 stop bits, no parity.
+  - Enable SCI RX interrupt (VIM Channel 13).
+  - Enable RTI (default config, VIM Channel 2).
+- **Buffer size:** 6144 bytes.
+- **No character loss at high baud rates** (937500) even with bulk data.
+- **Notes:**
+  - Use `sciReceive()` for bulk interrupt-driven reception.
+  - No PINMUX needed for SCI1.
+  - Remove or modify default handlers in `HL_notification.c`.
+  - RTI Compare 0 Period can be tuned in HALCoGen for 1ms tick.
+- **Lesson:** Interrupt-based UART is robust for high-speed, bulk data.
 
 ---
 
-### 📁 uart-crc32-interrupt-largefiles
+### 📁 uart-dma
 
-**Objective:** Enhance interrupt-based implementation to support **incremental CRC32 calculation** for large files.
-
-- Based on `uart-crc32-interrupt`.
-- Supports CRC32 computation over continuous large data streams using an **incremental algorithm**.
-- Resets and finalizes CRC after **5 seconds of idle timeout**.
-- Ideal for real-world scenarios where data exceeds buffer limits.
+- **DMA-based UART RX echo** on SCI3 (external USB-TTL via CH340E).
+- **HALCoGen does not support DMA for SCI1** on TMS570LC43x, so SCI3 is used.
+- **Manual DMA configuration** required.
+- **Critical finding:**
+  - **DMA will not work unless "Enable Cache" is unchecked** in the R5-MPU-PMU tab in HALCoGen.
+  - After disabling cache, DMA works on both new and old boards.
+- **Limitation:**
+  - **DMA RX echo is only reliable at lower baud rates (e.g., 26042).**
+  - At higher baud rates, character loss occurs.
+- **Lesson:** DMA and CPU cache can cause data coherency issues; always disable cache for DMA on this device.
 
 ---
 
 ### 📁 uart-crc32-dma
 
-**Objective:** Implement UART reception using DMA for robust, non-blocking, high-speed transfer.
+- **Current project:**
+  - DMA-based UART RX on SCI3, with CRC32 calculation after 5 seconds of idle.
+  - Baud rate set to 26042 for reliable operation.
+  - Uses RTI for 1ms tick and idle timeout detection.
+  - Welcome message at startup.
+  - **DMA is re-armed for every byte, so reception is continuous.**
+- **Lesson:** For continuous, reliable DMA UART RX and CRC32, use lower baud rates and disable cache.
 
-- **DMA RX echo is now working** after disabling cache in the R5-MPU-PMU tab in HALCoGen.
-- SCI3 (external USB-TTL via CH340E) is used for DMA, as SCI1 does not support DMA.
-- DMA setup is performed manually via `HL_sys_dma.c`.
-- **DMA Parameter RAM** does not need to be explicitly mapped in the linker file for most projects, but best practice is to reserve `.dmaRAM` at `0xFFF80000`.
+---
 
-**Critical Note:**
+## Problems Faced & Solutions
 
-> **DMA will not work reliably if cache is enabled.**  
-> You must uncheck "Enable Cache" in the R5-MPU-PMU tab in HALCoGen.  
-> This resolves the "DMA not working" issue on both new and old boards.
+- **Character loss at high baud rates** in blocking mode:
+  - Solution: Use interrupt-based UART or DMA (with cache disabled).
+- **DMA not working:**
+  - Solution: Disable cache in HALCoGen (R5-MPU-PMU tab).
+- **DMA not supported for SCI1:**
+  - Solution: Use SCI3 with external USB-TTL adapter.
+- **DMA RX echo only reliable at low baud rates:**
+  - Solution: Set baud rate to 26042 for DMA-based projects.
 
-**Baud Rate Note:**
+---
 
-> **DMA UART RX echo is only reliable at lower baud rates (e.g., 26042).**  
-> For high-speed UART, use interrupt or polling-based reception.
-
-**Reference:**
+## Reference
 
 - [TI E2E Forum - DMA not working on TMS570LC4357](https://e2e.ti.com/support/microcontrollers/arm-based-microcontrollers-group/arm-based-microcontrollers/f/arm-based-microcontrollers-forum/1542573/tms570lc4357-dma-not-working-on-tms570lc4357-no-transfer-no-errors-all-software-steps-correct)
 - [TI E2E: DMA can't read some data correctly (cache issue)](https://e2e.ti.com/support/microcontrollers/arm-based-microcontrollers-group/arm-based-microcontrollers/f/arm-based-microcontrollers-forum/1200732/tmdx570lc43hdk-dma-can-t-read-some-data-correctly-trying-to-sci-tx)
 
 ---
 
-## 📌 Summary
+## 📌 Summary Table
 
-| Project                         | Method                            | Reliable @ 937500 baud | Notes                                                     |
-| ------------------------------- | --------------------------------- | ---------------------- | --------------------------------------------------------- |
-| uart-crc32                      | Blocking                          | ❌ (char loss)         | Needs 1ms char delay in Tera Term                         |
-| uart-crc32-interrupt            | Interrupt + RTI                   | ✅                     | Reliable; idle-based framing                              |
-| uart-crc32-interrupt-largefiles | Interrupt + RTI + Incremental CRC | ✅                     | Supports large files with incremental CRC over 5s timeout |
-| uart-crc32-dma                  | DMA RX (cache disabled)           | ⚠️ (Low baud only)     | **Cache must be disabled for DMA to work**                |
-
----
-
-## 🔧 Future Work
-
-- Benchmark CPU load: interrupt vs. DMA.
-- Add CRC32 verification for received binary files.
-- Optionally extend support for ASCII/binary data mode.
-- Add UART transmit path for CRC acknowledgment.
+| Project                                                              | Method                            | Reliable @ 937500 baud | Notes                                                                            |
+| -------------------------------------------------------------------- | --------------------------------- | ---------------------- | -------------------------------------------------------------------------------- |
+| [uart-crc32](./uart-crc32)                                           | Blocking                          | ❌ (char loss)         | Needs 1ms char delay in Tera Term                                                |
+| [uart-crc32-interrupt](./uart-crc32-interrupt)                       | Interrupt + RTI                   | ✅                     | Reliable; idle-based framing                                                     |
+| [uart-crc32-interrupt-largefiles](./uart-crc32-interrupt-largefiles) | Interrupt + RTI + Incremental CRC | ✅                     | Supports large files with incremental CRC over 5s timeout                        |
+| [uart-dma](./uart-dma)                                               | DMA RX (cache disabled)           | ⚠️ (Low baud only)     | **Cache must be disabled for DMA to work. Reliable at ≤26042 baud.**             |
+| [uart-crc32-dma](./uart-crc32-dma)                                   | DMA RX + CRC32 (cache disabled)   | ⚠️ (Low baud only)     | Continuous stream, 5s idle CRC, cache must be disabled, reliable at ≤26042 baud. |
 
 ---
 
-## 📜 License
+## License
 
 This repository is provided for educational and reference purposes. Not intended for direct production use. Please refer to each file header for any specific restrictions.
-
----
-
-## Reference
-
-For detailed discussion, troubleshooting steps, and TI community support, see:
-
-- [TI E2E Forum: FAQ - TMS570LC4357: Examples and Demos available for Hercules Controllers](https://e2e.ti.com/support/microcontrollers/arm-based-microcontrollers-group/arm-based-microcontrollers/f/arm-based-microcontrollers-forum/1275733/faq-tms570lc4357-examples-and-demos-available-for-hercules-controllers-e-g-tms570x-rm57x-and-rm46x-etc)
-- [TI E2E: DMA can't read some data correctly (cache issue)](https://e2e.ti.com/support/microcontrollers/arm-based-microcontrollers-group/arm-based-microcontrollers/f/arm-based-microcontrollers-forum/1200732/tmdx570lc43hdk-dma-can-t-read-some-data-correctly-trying-to-sci-tx)
 
 ---
 
