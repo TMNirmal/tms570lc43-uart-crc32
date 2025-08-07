@@ -240,8 +240,6 @@ void _c_int00(void)
 /* USER CODE BEGIN (23) */
 /* USER CODE END */
 
-    _cacheEnable_();
-
 /* USER CODE BEGIN (24) */
 /* USER CODE END */
 

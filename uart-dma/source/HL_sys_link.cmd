@@ -61,7 +61,6 @@ MEMORY
     FLASH1  (RX) : origin=0x00200000 length=0x00200000
     STACKS  (RW) : origin=0x08000000 length=0x00001500
     RAM     (RW) : origin=0x08001500 length=0x0007EB00
-    DMARAM  (RW) : origin=0xFFF80000 length=0x00000800
 
 /* USER CODE BEGIN (3) */
 /* USER CODE END */
@@ -86,7 +85,6 @@ SECTIONS
     .bss     : {} > RAM
     .data    : {} > RAM
     .sysmem  : {} > RAM
-    .dmaRAM  : {} > DMARAM
 	
 
 /* USER CODE BEGIN (6) */
